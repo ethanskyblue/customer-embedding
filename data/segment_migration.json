@@ -1,0 +1,5 @@
+{
+  "growth":  { "growth": 261, "stable": 24, "dormant": 1 },
+  "stable":  { "growth": 22, "stable": 1040, "dormant": 44 },
+  "dormant": { "growth": 3, "stable": 42, "dormant": 563 }
+}
