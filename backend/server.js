@@ -5,9 +5,11 @@
 // 실제 서비스에서는 이 부분을 DB 조회(예: SELECT ... FROM segment_snapshot)로 교체하면 됩니다.
 // backend_api_spec.md 의 스키마/엔드포인트 정의를 그대로 따릅니다.
 
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
+const { dispatchCampaign, GATEWAYS } = require("./gateways");
 
 const app = express();
 app.use(cors());
@@ -35,6 +37,7 @@ const SEGMENT_META = {
 };
 
 // 고객 목업 60명 (실서비스에서는 customer_features 테이블 조회로 교체)
+// phone/email은 카카오·SMS·이메일 게이트웨이 데모용으로 추가한 필드입니다.
 function buildCustomers() {
   const cats = ["원피스", "니트", "청바지", "코트", "가디건", "액세서리", "신발", "가방"];
   const segs = ["growth", "stable", "dormant"];
@@ -48,13 +51,16 @@ function buildCustomers() {
       : seg === "stable" ? { recency: [25, 75], freq: [0.5, 1.6], amt: [300000, 1400000] }
       : { recency: [90, 220], freq: [0.1, 0.7], amt: [20000, 300000] };
     const rand = (a, b) => a + Math.random() * (b - a);
+    const id = "CUST" + String(i).padStart(5, "0");
     rows.push({
-      id: "CUST" + String(i).padStart(5, "0"),
-      segment: seg,
+      id, segment: seg,
       recency: Math.round(rand(...base.recency)),
       freq: rand(...base.freq).toFixed(2),
       amount: Math.round(rand(...base.amt)),
       topCategory: cats[Math.floor(Math.random() * cats.length)],
+      // 데모용 가짜 연락처 (실서비스에서는 CRM/ERP의 실제 연락처로 교체, 마스킹·동의 여부 확인 필수)
+      phone: "0100000" + String(i).padStart(4, "0"),
+      email: id.toLowerCase() + "@example.com",
     });
   }
   return rows;
@@ -94,30 +100,55 @@ app.get("/api/v1/customers/:id", (req, res) => {
   res.json(row);
 });
 
-// 실제 발송 게이트웨이(카카오/이메일/SMS) 연동 지점.
-// 지금은 요청을 로그에만 남기고 성공으로 응답합니다.
-app.post("/api/v1/campaigns/send", (req, res) => {
-  const { target, channel, message_template_id } = req.body || {};
+// 실제 발송 게이트웨이(카카오 알림톡/SMS/이메일/푸시) 연동.
+// gateway 파라미터로 카카오/SMS/이메일/푸시 중 하나를 지정하면 gateways/index.js가
+// 해당 대행사 API를 실제로 호출합니다 (자격증명이 없으면 자동으로 시뮬레이션 처리).
+app.post("/api/v1/campaigns/send", async (req, res) => {
+  const { target, channel, gateway, message_template_id, title, message } = req.body || {};
   if (!target || !channel) {
     return res.status(400).json({ error: "invalid_request", message: "target, channel은 필수입니다." });
   }
-  const seg = target.type === "segment" ? SEED_SUMMARY.segments.find(s => s.id === target.id) : null;
-  const recipients = seg ? seg.n : 1;
+  if (!message) {
+    return res.status(400).json({ error: "invalid_request", message: "message(발송 문구)는 필수입니다." });
+  }
 
-  // TODO: 실제 발송 게이트웨이 호출
-  // - 카카오 알림톡: 카카오 비즈메시지 API
-  // - 이메일: SendGrid / AWS SES
-  // - SMS: 알리고 / NAVER Cloud SENS
-  // - 앱 푸시: FCM
+  const targetCustomers = target.type === "segment"
+    ? CUSTOMERS.filter(c => c.segment === target.id)
+    : CUSTOMERS.filter(c => c.id === target.id);
+
+  const gatewayId = gateway || null; // 'kakao' | 'sms' | 'email' | 'push' | null(=미지정, 광고 채널 등)
+  const dispatchResult = await dispatchCampaign(
+    gatewayId,
+    { segmentId: target.type === "segment" ? target.id : targetCustomers[0]?.segment, title, message, templateCode: message_template_id },
+    targetCustomers,
+  );
 
   const log = {
     log_id: "CMP-" + Date.now(),
-    target, channel, message_template_id,
-    recipients, status: "sent",
+    target, channel, gateway: gatewayId, message_template_id,
+    recipients: dispatchResult.recipients,
+    status: dispatchResult.status,
+    provider: dispatchResult.provider,
+    detail: dispatchResult.detail,
     sent_at: new Date().toISOString(),
   };
   campaignLogs.unshift(log);
-  res.json({ status: "queued", log_id: log.log_id, estimated_recipients: recipients });
+
+  res.json({
+    status: dispatchResult.status,
+    log_id: log.log_id,
+    estimated_recipients: dispatchResult.recipients,
+    provider: dispatchResult.provider,
+    detail: dispatchResult.detail,
+  });
+});
+
+// 등록된 발송 게이트웨이와 자격증명 설정 여부 (운영 점검용)
+app.get("/api/v1/gateways/status", (req, res) => {
+  const status = Object.fromEntries(
+    Object.entries(GATEWAYS).map(([id, gw]) => [id, { configured: gw.isConfigured() }])
+  );
+  res.json(status);
 });
 
 app.get("/api/v1/campaigns/logs", (req, res) => {

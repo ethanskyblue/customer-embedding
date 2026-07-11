@@ -60,7 +60,35 @@ python3 -m http.server 8000   # 또는 VSCode Live Server 등
    - **Publish Directory**: `.`
 4. 배포 완료 → `https://프로젝트명.onrender.com`으로 접속하면 실제 백엔드와 연동된 앱이 뜹니다.
 
-## ERP 연동 (실제 데이터로 전환하기)
+## 캠페인 발송 게이트웨이 설정 (카카오 알림톡 등)
+
+`backend/gateways/`에 채널별 발송 코드가 들어있습니다.
+
+| 파일 | 채널 | 대행사/제공자 |
+|---|---|---|
+| `kakaoAlimtalk.js` | 카카오 알림톡 | 알리고 (다른 대행사 쓰면 이 파일만 교체) |
+| `sms.js` | SMS/LMS | 알리고 |
+| `email.js` | 이메일 | SendGrid |
+| `push.js` | 앱 푸시 | FCM (세그먼트 단위 토픽 발송) |
+
+**설정 방법**
+```bash
+cd backend
+cp .env.example .env
+# .env를 열어 실제 발급받은 키 값을 채워넣으세요.
+```
+`.env`를 채우지 않으면 앱은 정상 동작하되, 캠페인 발송이 실제로 나가지 않고 `"simulated"` 상태로 처리됩니다.
+Render Web Service에 배포할 때는 `.env` 파일 대신 Render 대시보드의 **Environment** 탭에 동일한 키를 등록하세요.
+
+**Instagram/YouTube/TikTok 같은 광고 채널은 이 게이트웨이 대상이 아닙니다.** 개별 API로 1:1 발송하는 방식이
+아니라 광고 관리자(Meta/TikTok Ads Manager)에서 캠페인으로 집행해야 하는 채널이라, 프론트엔드에서
+"발송" 대신 "광고 관리자 안내" 버튼으로 표시되고, 백엔드는 `status: "skipped"`로 응답합니다.
+
+**주의**: 지금 구현은 세그먼트 전체(수백~수천 명)에게 보낼 때도 HTTP 요청 안에서 동기적으로 반복 호출합니다
+(데모 목적으로 최대 20명까지만 실제 호출). 실서비스에서는 요청을 큐(SQS/RabbitMQ/BullMQ 등)에 넣고
+워커가 비동기로 순차 발송하도록 바꿔야 합니다 — 그렇지 않으면 세그먼트가 크면 요청이 타임아웃납니다.
+
+
 
 나중에 ERP에 구매 이력·고객 마스터 데이터가 있다면 연결할 수 있습니다. 다만 ERP 하나로 전체 파이프라인이
 채워지지는 않는다는 점을 먼저 이해하시면 계획을 세우기 쉽습니다.
@@ -90,8 +118,8 @@ Ads API         ─┘                                                          
 
 - `backend/server.js`의 데이터는 하드코딩된 시드 값입니다. 실제 서비스에서는 `SEED_*` 부분을
   DB 조회 쿼리로 교체하세요 (스키마는 `backend_api_spec.md` 참고).
-- `POST /api/v1/campaigns/send`는 실제 카카오/이메일/SMS 발송을 하지 않습니다.
-  `server.js`의 `TODO` 주석 부분에 실제 발송 게이트웨이 연동 코드를 추가해야 합니다.
+- `POST /api/v1/campaigns/send`는 이제 `backend/gateways/`를 통해 실제 카카오/SMS/이메일/푸시 발송을 시도합니다
+  (자격증명 미설정 시 자동 시뮬레이션). 세그먼트 규모가 커지면 동기 반복 대신 큐 기반 비동기 처리로 바꾸세요.
 - Render 무료 플랜의 Web Service는 트래픽이 없으면 슬립 모드로 전환되어
   첫 요청 시 응답이 몇 초 느릴 수 있습니다 (콜드 스타트).
 - 캠페인 발송 이력은 브라우저의 `localStorage`에 저장되므로 기기/브라우저마다 따로 쌓입니다.

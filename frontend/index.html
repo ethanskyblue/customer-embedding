@@ -7,7 +7,7 @@
 <script>
   // 배포 시 여기를 실제 백엔드 URL로 바꿔주세요. (예: https://retention-api.onrender.com)
   window.RETENTION_API_BASE = "http://localhost:4000";
-</' + 'script>
+</script>
 </head>
 <body>
 <div id="root"></div>
@@ -263,7 +263,7 @@ async function apiSendCampaign(payload) {
   } catch (e) {
     console.warn("백엔드 연결 실패, 발송을 시뮬레이션합니다:", e.message);
     await delay(300);
-    return { status: "queued", log_id: "CMP-" + Date.now(), estimated_recipients: payload.estimated_recipients || 1 };
+    return { status: "simulated", provider: payload.gateway || "none", detail: "백엔드 미연결 — 프론트엔드에서 시뮬레이션", log_id: "CMP-" + Date.now(), estimated_recipients: payload.estimated_recipients || 1 };
   }
 }
 
@@ -358,12 +358,28 @@ function closeModal() { state.modal = null; render(); }
 async function confirmSend() {
   const { segmentId, message } = state.modal;
   const seg = state.summary.segments.find(s => s.id === segmentId);
-  const res = await apiSendCampaign({ target: { type: "segment", id: segmentId }, channel: message[0], message_template_id: message[2], estimated_recipients: seg.n });
-  const entry = { log_id: res.log_id, segment: segmentId, segmentName: SEGMENT_META[segmentId].name, channel: message[0], copy: message[2], recipients: res.estimated_recipients, ts: Date.now(), status: "sent" };
+  const gateway = message[3];
+  const res = await apiSendCampaign({
+    target: { type: "segment", id: segmentId },
+    channel: message[0],
+    gateway,
+    message_template_id: message[1],
+    title: message[1],
+    message: message[2],
+    estimated_recipients: seg.n,
+  });
+  const entry = {
+    log_id: res.log_id, segment: segmentId, segmentName: SEGMENT_META[segmentId].name,
+    channel: message[0], gateway, copy: message[2],
+    recipients: res.estimated_recipients, ts: Date.now(),
+    status: res.status, provider: res.provider, detail: res.detail,
+  };
   state.campaignLog.unshift(entry);
-  await saveCampaignLog(entry);
+  saveCampaignLog(entry);
   state.modal = null;
-  showToast(`"${message[0]}" 캠페인 발송 완료 (시뮬레이션, 대상 ${res.estimated_recipients.toLocaleString()}명)`);
+
+  const statusLabel = { sent: "발송 완료", simulated: "발송 완료 (시뮬레이션)", partial: "일부만 발송됨", failed: "발송 실패", skipped: "발송 불가" }[res.status] || res.status;
+  showToast(`"${message[0]}" ${statusLabel} — 대상 ${res.estimated_recipients.toLocaleString()}명${res.detail ? " · " + res.detail : ""}`);
   render();
 }
 
@@ -503,12 +519,13 @@ function renderSearch() {
 function renderCampaign() {
   if (!state.summary) return `<div class="empty-state">불러오는 중…</div>`;
   const MESSAGES = {
-    growth: [["Instagram / YouTube","브랜드 스토리텔링 · 룩북 필름","당신의 취향을 가장 잘 아는 브랜드, 이번 시즌도 함께해요"],
-             ["TikTok","신제품 런칭 티저","먼저 만나보는 신상 — VIP 얼리 액세스"]],
-    stable: [["Instagram","트렌드 큐레이션 숏폼 + 코디 추천","이번 주 트렌드, 니트엔 이 스커트 어때요?"],
-             ["네이버 / 카카오","신상 + 소폭 할인 결합 메시지","신상 입고 + 첫 구매 혜택, 지금 확인하세요"]],
-    dormant: [["네이버 / 카카오 / Facebook","강한 가격 인센티브 윈백","오랜만이에요 — 지금 30% 할인으로 다시 만나요"],
-              ["Instagram","짧고 강한 CTA (저관여 대응)","놓치면 후회할 특가, 24시간 한정"]],
+    growth: [["Instagram / YouTube","브랜드 스토리텔링 · 룩북 필름","당신의 취향을 가장 잘 아는 브랜드, 이번 시즌도 함께해요", null],
+             ["TikTok","신제품 런칭 티저","먼저 만나보는 신상 — VIP 얼리 액세스", null],
+             ["앱 푸시 (코디 추천)","원피스 조회 고객 대상 가방·액세서리 제안","고르신 원피스에 어울리는 가방을 찾았어요", "push"]],
+    stable: [["Instagram","트렌드 큐레이션 숏폼 + 코디 추천","이번 주 트렌드, 니트엔 이 스커트 어때요?", null],
+             ["네이버 / 카카오","신상 + 소폭 할인 결합 메시지","신상 입고 + 첫 구매 혜택, 지금 확인하세요", "kakao"]],
+    dormant: [["네이버 / 카카오 / Facebook","강한 가격 인센티브 윈백","오랜만이에요 — 지금 30% 할인으로 다시 만나요", "kakao"],
+              ["Instagram","짧고 강한 CTA (저관여 대응)","놓치면 후회할 특가, 24시간 한정", null]],
   };
   const segs = state.summary.segments;
   return `
@@ -519,11 +536,11 @@ function renderCampaign() {
         <div class="msg-card">
           <div class="msg-top">
             <div>
-              <div class="msg-channel">${esc(m[0])}</div>
+              <div class="msg-channel">${esc(m[0])} ${m[3] ? `<span class="status-tag" style="background:var(--navy-soft);color:var(--navy)">실발송 가능 (${m[3]})</span>` : `<span class="status-tag" style="background:var(--paper);color:var(--ink-faint)">광고 채널 · 직접발송 불가</span>`}</div>
               <div class="msg-format">${esc(m[1])}</div>
               <div class="msg-copy">"${esc(m[2])}"</div>
             </div>
-            <button class="btn" onclick='openSendModal("${s.id}", ${JSON.stringify(m)})'>발송</button>
+            <button class="btn" onclick='openSendModal("${s.id}", ${JSON.stringify(m)})'>${m[3] ? "발송" : "광고 관리자 안내"}</button>
           </div>
         </div>`).join("")}
     `).join("")}
@@ -532,15 +549,19 @@ function renderCampaign() {
     ${state.campaignLog.length === 0 ? `<div class="empty-state">아직 발송 이력이 없습니다.</div>` : `
       <table class="log-table">
         <tr><th>시각</th><th>세그먼트</th><th>채널</th><th>메시지</th><th>대상</th><th>상태</th></tr>
-        ${state.campaignLog.map(l => `
+        ${state.campaignLog.map(l => {
+          const label = { sent: "발송 완료", simulated: "시뮬레이션", partial: "일부 발송", failed: "발송 실패", skipped: "발송 불가(광고 채널)" }[l.status] || l.status;
+          const color = l.status === "sent" ? "var(--green)" : l.status === "failed" ? "var(--brick)" : l.status === "skipped" ? "var(--ink-faint)" : "var(--brass)";
+          return `
           <tr>
             <td style="font-family:var(--font-data);font-size:11.5px">${new Date(l.ts).toLocaleString()}</td>
             <td>${esc(l.segmentName)}</td>
-            <td>${esc(l.channel)}</td>
+            <td>${esc(l.channel)}${l.gateway ? ` (${esc(l.gateway)})` : ""}</td>
             <td>"${esc(l.copy)}"</td>
             <td>${l.recipients.toLocaleString()}명</td>
-            <td><span class="status-tag">발송완료(시뮬레이션)</span></td>
-          </tr>`).join("")}
+            <td><span class="status-tag" style="background:transparent;border:1px solid ${color};color:${color}">${label}</span></td>
+          </tr>`;
+        }).join("")}
       </table>`}
   `;
 }
@@ -549,18 +570,26 @@ function renderModal() {
   if (!state.modal) return "";
   const { segmentId, message } = state.modal;
   const seg = state.summary.segments.find(s => s.id === segmentId);
+  const gateway = message[3];
   return `
     <div class="modal-overlay" onclick="if(event.target===this) closeModal()">
       <div class="modal-box">
-        <h3>캠페인 발송 확인</h3>
+        <h3>${gateway ? "캠페인 발송 확인" : "광고 채널 안내"}</h3>
         <p>
-          <b>${SEGMENT_META[segmentId].name}</b> 세그먼트 <b>${seg.n.toLocaleString()}명</b>에게<br/>
-          "${esc(message[0])}" 채널로 아래 메시지를 발송합니다.<br/><br/>
-          <i>"${esc(message[2])}"</i>
+          ${gateway ? `
+            <b>${SEGMENT_META[segmentId].name}</b> 세그먼트 <b>${seg.n.toLocaleString()}명</b>에게<br/>
+            <b>${esc(gateway)}</b> 게이트웨이로 아래 메시지를 발송합니다.<br/><br/>
+            <i>"${esc(message[2])}"</i><br/><br/>
+            게이트웨이 자격증명이 설정되어 있지 않으면 자동으로 시뮬레이션 처리됩니다.
+          ` : `
+            "${esc(message[0])}"는 개별 API로 1:1 발송하는 채널이 아니라 광고 관리자(Meta/TikTok Ads Manager 등)에서<br/>
+            캠페인으로 직접 집행해야 하는 채널입니다. 아래 카피를 광고 관리자에 입력해 집행해주세요.<br/><br/>
+            <i>"${esc(message[2])}"</i>
+          `}
         </p>
         <div class="modal-actions">
-          <button class="btn ghost" style="border:1px solid var(--ink)" onclick="closeModal()">취소</button>
-          <button class="btn" onclick="confirmSend()">발송 확정</button>
+          <button class="btn ghost" style="border:1px solid var(--ink)" onclick="closeModal()">${gateway ? "취소" : "닫기"}</button>
+          ${gateway ? `<button class="btn" onclick="confirmSend()">발송 확정</button>` : ""}
         </div>
       </div>
     </div>
