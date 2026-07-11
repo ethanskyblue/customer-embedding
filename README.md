@@ -1,7 +1,7 @@
-# 고객 세그먼트 리텐션 앱
+# Customer Embedding App
 
 ```
-retention-app/
+customer-embedding/
 ├── data/
 │   ├── customer_embedding_training_data_2000_segmented.xlsx   ← 원본 학습용 데이터 (합성 데이터)
 │   ├── segment_summary.json     ← Python 클러스터링 배치 잡의 산출물 (백엔드가 이걸 읽음)
@@ -33,25 +33,25 @@ python3 -m http.server 8000   # 또는 VSCode Live Server 등
 # 브라우저에서 http://localhost:8000 접속
 ```
 
-`frontend/index.html`의 `window.RETENTION_API_BASE`가 기본으로 `http://localhost:4000`을 가리키고 있어서
+`frontend/index.html`의 `window.CUSTOMER_EMBEDDING_API_BASE`가 기본으로 `http://localhost:4000`을 가리키고 있어서
 로컬에서 백엔드를 켜둔 상태라면 바로 실제 API 데이터가 표시됩니다.
 백엔드를 안 켜도 화면은 자동으로 목업 데이터로 대체되어 정상 동작합니다.
 
 ## Render 배포 (2단계)
 
 ### 1) 백엔드 배포 (Web Service)
-1. 이 저장소를 GitHub에 푸시
+1. 이 저장소를 GitHub `customer-embedding` 저장소에 푸시
 2. Render 대시보드 → **New +** → **Web Service**
 3. 저장소 연결 후 설정:
    - **Root Directory**: `backend`
    - **Build Command**: `npm install`
    - **Start Command**: `npm start`
-4. 배포 완료 후 나오는 URL을 기록 (예: `https://retention-api-xxxx.onrender.com`)
+4. 배포 완료 후 나오는 URL을 기록 (예: `https://customer-embedding-api-xxxx.onrender.com`)
 
 ### 2) 프론트엔드 배포 (Static Site)
-1. `frontend/index.html` 안의 `window.RETENTION_API_BASE` 값을 위에서 받은 백엔드 URL로 수정 후 다시 커밋/푸시
+1. `frontend/index.html` 안의 `window.CUSTOMER_EMBEDDING_API_BASE` 값을 위에서 받은 백엔드 URL로 수정 후 다시 커밋/푸시
    ```js
-   window.RETENTION_API_BASE = "https://retention-api-xxxx.onrender.com";
+   window.CUSTOMER_EMBEDDING_API_BASE = "https://customer-embedding-api-xxxx.onrender.com";
    ```
 2. Render 대시보드 → **New +** → **Static Site**
 3. 같은 저장소 연결 후 설정:
@@ -90,6 +90,8 @@ Render Web Service에 배포할 때는 `.env` 파일 대신 Render 대시보드�
 
 
 
+## ERP 연동 (실제 데이터로 전환하기)
+
 나중에 ERP에 구매 이력·고객 마스터 데이터가 있다면 연결할 수 있습니다. 다만 ERP 하나로 전체 파이프라인이
 채워지지는 않는다는 점을 먼저 이해하시면 계획을 세우기 쉽습니다.
 
@@ -115,6 +117,8 @@ Ads API         ─┘                                                          
 - ERP마다(SAP, 더존, Oracle NetSuite 등) 연동 방식이 다릅니다 — DB 직접 연결이 가능한 경우도 있고, REST/SOAP API로만 여는 경우도 있습니다. 사용 중인 ERP의 연동 옵션부터 확인이 필요합니다.
 - 실제 고객 데이터가 들어오는 순간 개인정보 취급 이슈가 생기므로, 접근 권한·마스킹·보관기한 등 사내 데이터 거버넌스 정책 검토가 선행되어야 합니다.
 - 클러스터링 로직 자체(PCA + K-means)는 바꿀 필요 없이 재사용 가능합니다 — 입력 데이터 소스만 늘어나는 구조입니다.
+
+## 주의사항 / TODO
 
 - `backend/server.js`의 데이터는 하드코딩된 시드 값입니다. 실제 서비스에서는 `SEED_*` 부분을
   DB 조회 쿼리로 교체하세요 (스키마는 `backend_api_spec.md` 참고).

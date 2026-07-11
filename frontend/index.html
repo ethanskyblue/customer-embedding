@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>고객 세그먼트 리텐션 대시보드</title>
+<title>Customer Embedding App — 고객 세그먼트 대시보드</title>
 <script>
-  // 배포 시 여기를 실제 백엔드 URL로 바꿔주세요. (예: https://retention-api.onrender.com)
-  window.RETENTION_API_BASE = "http://localhost:4000";
+  // 배포 시 여기를 실제 백엔드 URL로 바꿔주세요. (예: https://customer-embedding-api.onrender.com)
+  window.CUSTOMER_EMBEDDING_API_BASE = "http://localhost:4000";
 </script>
 </head>
 <body>
@@ -140,7 +140,7 @@
    - 백엔드가 아직 없거나 호출에 실패하면 자동으로 목업 데이터로 폴백합니다
      (데모/오프라인 상황에서도 화면이 항상 정상적으로 보이도록 하기 위함).
    ========================================================================= */
-const API_BASE = window.RETENTION_API_BASE || "http://localhost:4000";
+const API_BASE = window.CUSTOMER_EMBEDDING_API_BASE || "http://localhost:4000";
 
 async function fetchJson(path, options) {
   const res = await fetch(API_BASE + path, options);
@@ -290,7 +290,7 @@ let state = {
 function esc(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 function fmtWon(n) { return n.toLocaleString() + "원"; }
 
-const LOCAL_LOG_KEY = "retention_app_campaign_log";
+const LOCAL_LOG_KEY = "customer_embedding_app_campaign_log";
 
 function loadCampaignLog() {
   try {
@@ -393,7 +393,7 @@ function renderTopbar() {
   return `
     <div class="topbar">
       <div>
-        <div class="eyebrow">Customer Retention App · 배치 동기화 기반</div>
+        <div class="eyebrow">Customer Embedding App · 배치 동기화 기반</div>
         <h1>세 갈래로 갈라진 고객, 세 갈래의 전략</h1>
         <p class="subhead">백엔드 세그먼트 API(GET /api/v1/segments/*)와 캠페인 발송 API(POST /api/v1/campaigns/send)를 연동한 운영용 대시보드입니다.</p>
       </div>

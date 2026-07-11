@@ -157,7 +157,7 @@ app.get("/api/v1/campaigns/logs", (req, res) => {
 });
 
 app.get("/", (req, res) => {
-  res.json({ status: "ok", service: "retention-api", endpoints: [
+  res.json({ status: "ok", service: "customer-embedding-api", endpoints: [
     "GET /api/v1/segments/summary", "GET /api/v1/segments/trends", "GET /api/v1/segments/migration",
     "GET /api/v1/customers?query=", "GET /api/v1/customers/:id",
     "POST /api/v1/campaigns/send", "GET /api/v1/campaigns/logs",
@@ -165,5 +165,5 @@ app.get("/", (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Retention API listening on port ${PORT}`);
+  console.log(`Customer Embedding API listening on port ${PORT}`);
 });

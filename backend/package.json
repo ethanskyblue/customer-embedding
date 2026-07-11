@@ -1,7 +1,7 @@
 {
-  "name": "retention-app-backend",
+  "name": "customer-embedding-backend",
   "version": "1.0.0",
-  "description": "Customer segment retention dashboard — reference API implementation",
+  "description": "Customer Embedding App — segment/retention backend API (reference implementation)",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

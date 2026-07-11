@@ -1,4 +1,4 @@
-# 고객 세그먼트 리텐션 대시보드 — 백엔드 연동 아키텍처 및 API 명세
+# Customer Embedding App — 백엔드 연동 아키텍처 및 API 명세
 
 ## 1. 전체 데이터 흐름
 
@@ -136,6 +136,6 @@ GET /api/v1/campaigns/logs?segment_id=dormant&limit=20
 - 앱 푸시: FCM(Firebase Cloud Messaging)
 
 ## 6. 프론트엔드 연동 방법
-지금 드리는 `customer_retention_app.html`은 위 5개 엔드포인트를 호출하는 지점에
+지금 드리는 `frontend/index.html`(Customer Embedding App)은 위 5개 엔드포인트를 호출하는 지점에
 `// TODO: fetch('/api/v1/...')`  주석과 함께 목업 함수가 들어가 있습니다.
 실제 백엔드가 준비되면 목업 함수 내부를 fetch 호출로 교체하기만 하면 됩니다 (UI 로직은 변경 불필요).
