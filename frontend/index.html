@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>고객 세그먼트 리텐션 대시보드</title>
+<script>
+  // 배포 시 여기를 실제 백엔드 URL로 바꿔주세요. (예: https://retention-api.onrender.com)
+  window.RETENTION_API_BASE = "http://localhost:4000";
+</' + 'script>
+</head>
+<body>
+<div id="root"></div>
+<style>
+  :root {
+    --paper: #F7F4EE; --paper-raised: #FFFFFF;
+    --ink: #1B1F2A; --ink-soft: #5B6070; --ink-faint: #8A8F9C;
+    --brass: #A97D50; --brass-soft: #EFE2D2;
+    --line: #E4DFD3;
+    --green: #2E7D32; --green-soft: #E5F1E6;
+    --navy: #1F3864; --navy-soft: #E7ECF4;
+    --brick: #B23B3B; --brick-soft: #F7E7E5;
+    --font-display: Georgia, 'Iowan Old Style', 'Palatino Linotype', 'Noto Serif KR', serif;
+    --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', sans-serif;
+    --font-data: 'SF Mono', 'Consolas', 'Menlo', monospace;
+  }
+  * { box-sizing: border-box; }
+  #root { background: var(--paper); color: var(--ink); font-family: var(--font-body); min-height: 100%; padding: 32px 24px 80px; }
+  .wrap { max-width: 1120px; margin: 0 auto; }
+
+  /* header */
+  .topbar { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 14px; margin-bottom: 10px; }
+  .eyebrow { font-family: var(--font-data); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--brass); margin-bottom: 8px; }
+  h1 { font-family: var(--font-display); font-weight: 400; font-size: 34px; line-height: 1.15; margin: 0 0 6px; }
+  .subhead { color: var(--ink-soft); font-size: 14px; max-width: 640px; line-height: 1.6; }
+
+  .sync-box { text-align: right; font-size: 12px; color: var(--ink-faint); }
+  .sync-time { font-family: var(--font-data); color: var(--ink-soft); }
+  .btn { font-family: var(--font-body); font-size: 12.5px; font-weight: 600; border: 1px solid var(--ink); background: var(--ink); color: #fff;
+    padding: 8px 14px; border-radius: 3px; cursor: pointer; margin-top: 6px; }
+  .btn:hover { opacity: 0.85; }
+  .btn:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+  .btn.ghost { background: transparent; color: var(--ink); }
+  .btn.small { padding: 5px 10px; font-size: 11.5px; }
+  .btn[disabled] { opacity: 0.5; cursor: default; }
+
+  /* tabs */
+  .tabs { display: flex; gap: 4px; margin: 26px 0 26px; border-bottom: 1px solid var(--line); }
+  .tab-btn { font-family: var(--font-body); font-size: 13.5px; padding: 10px 16px; background: none; border: none;
+    color: var(--ink-faint); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tab-btn.active { color: var(--ink); border-bottom-color: var(--brass); font-weight: 600; }
+  .tab-btn:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+
+  /* segment cards (reused) */
+  .seg-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 28px; }
+  .seg-card { background: var(--paper-raised); border: 1px solid var(--line); border-left: 4px solid var(--seg-color, var(--brass));
+    border-radius: 3px; padding: 16px 18px; cursor: pointer; text-align: left; transition: transform .15s ease, box-shadow .15s ease; }
+  .seg-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(27,31,42,0.08); }
+  .seg-card.active { background: var(--seg-color, var(--brass)); color: #fff; }
+  .seg-card.active .seg-name, .seg-card.active .seg-meta { color: #fff; }
+  .seg-name { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+  .seg-meta { font-family: var(--font-data); font-size: 12px; color: var(--ink-faint); display: flex; gap: 10px; }
+  .seg-size { font-family: var(--font-display); font-size: 24px; margin-top: 8px; }
+  .seg-growth { font-family: var(--font-data); font-size: 13px; font-weight: 600; margin-top: 4px; }
+
+  .section-label { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--brass); font-weight: 600; margin: 30px 0 12px; }
+  .panel { border-top: 1px solid var(--line); padding-top: 26px; }
+  .panel-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 6px; flex-wrap: wrap; }
+  .panel-title { font-family: var(--font-display); font-size: 24px; }
+  .panel-badge { font-family: var(--font-data); font-size: 12px; padding: 3px 9px; border-radius: 20px; }
+  .panel-oneliner { color: var(--ink-soft); font-size: 14px; line-height: 1.7; margin: 10px 0 20px; max-width: 720px; font-style: italic; }
+
+  .chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { background: var(--paper-raised); border: 1px solid var(--line); border-radius: 20px; padding: 7px 13px; font-size: 12.5px; }
+  .chip .pct { color: var(--ink-faint); font-family: var(--font-data); font-size: 11px; margin-left: 4px; }
+  .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .metric-card { background: var(--paper-raised); border: 1px solid var(--line); border-radius: 4px; padding: 14px 16px; }
+  .metric-label { font-size: 11px; color: var(--ink-faint); margin-bottom: 6px; }
+  .metric-value { font-family: var(--font-data); font-size: 18px; font-weight: 600; }
+
+  /* trends */
+  .trend-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; align-items: start; }
+  .card { background: var(--paper-raised); border: 1px solid var(--line); border-radius: 5px; padding: 20px; }
+  .legend { display: flex; gap: 16px; margin-bottom: 12px; font-size: 12px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .cohort-list { list-style: none; padding: 0; margin: 0; }
+  .cohort-list li { display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+  .cohort-list li:last-child { border-bottom: none; }
+  .cohort-val { font-family: var(--font-data); font-weight: 600; }
+  table.mig { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 10px; }
+  table.mig th, table.mig td { border: 1px solid var(--line); padding: 8px 10px; text-align: center; }
+  table.mig th { background: var(--paper); font-weight: 600; }
+  table.mig td.diag { background: var(--brass-soft); font-weight: 700; }
+
+  /* search */
+  .search-row { display: flex; gap: 10px; margin-bottom: 20px; }
+  .search-input { flex: 1; padding: 10px 14px; border: 1px solid var(--line); border-radius: 3px; font-size: 14px; background: var(--paper-raised); color: var(--ink); }
+  .search-input:focus-visible { outline: 2px solid var(--brass); }
+  .result-list { display: flex; flex-direction: column; gap: 8px; }
+  .result-row { display: grid; grid-template-columns: 110px 90px 90px 90px 1fr 90px; gap: 10px; align-items: center;
+    background: var(--paper-raised); border: 1px solid var(--line); border-radius: 4px; padding: 10px 14px; font-size: 12.5px; }
+  .result-row.head { background: transparent; border: none; color: var(--ink-faint); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; padding: 0 14px; }
+  .seg-pill { display: inline-block; padding: 3px 9px; border-radius: 12px; font-size: 11px; font-weight: 600; color: #fff; }
+  .empty-state { text-align: center; padding: 40px 0; color: var(--ink-faint); font-size: 13px; }
+
+  /* campaign */
+  .msg-card { background: var(--paper-raised); border: 1px solid var(--line); border-radius: 4px; padding: 16px; margin-bottom: 12px; }
+  .msg-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .msg-channel { font-family: var(--font-data); font-size: 11px; color: var(--brass); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+  .msg-format { font-size: 12.5px; color: var(--ink-soft); margin-bottom: 8px; }
+  .msg-copy { font-family: var(--font-display); font-size: 14.5px; font-style: italic; }
+  .log-table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 10px; }
+  .log-table th, .log-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  .status-tag { font-family: var(--font-data); font-size: 11px; padding: 2px 8px; border-radius: 10px; background: var(--green-soft); color: var(--green); }
+
+  /* modal */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(27,31,42,0.45); display: flex; align-items: center; justify-content: center; z-index: 50; }
+  .modal-box { background: var(--paper-raised); border-radius: 6px; padding: 24px; max-width: 420px; width: 90%; }
+  .modal-box h3 { font-family: var(--font-display); font-size: 19px; margin: 0 0 10px; }
+  .modal-box p { font-size: 13.5px; color: var(--ink-soft); line-height: 1.6; margin-bottom: 18px; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--ink); color: #fff; padding: 12px 18px; border-radius: 4px; font-size: 13px; z-index: 60; }
+
+  footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line); font-size: 11.5px; color: var(--ink-faint); line-height: 1.7; }
+
+  @media (max-width: 780px) {
+    .seg-strip { grid-template-columns: 1fr; }
+    .metric-grid { grid-template-columns: repeat(2, 1fr); }
+    .trend-grid { grid-template-columns: 1fr; }
+    .result-row, .result-row.head { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+
+<script>
+/* =========================================================================
+   API 연동 설정
+   - API_BASE를 백엔드 배포 주소로 바꾸면 실제 서버에서 데이터를 가져옵니다.
+   - 백엔드가 아직 없거나 호출에 실패하면 자동으로 목업 데이터로 폴백합니다
+     (데모/오프라인 상황에서도 화면이 항상 정상적으로 보이도록 하기 위함).
+   ========================================================================= */
+const API_BASE = window.RETENTION_API_BASE || "http://localhost:4000";
+
+async function fetchJson(path, options) {
+  const res = await fetch(API_BASE + path, options);
+  if (!res.ok) throw new Error("API error " + res.status);
+  return res.json();
+}
+
+const SEGMENT_META = {
+  growth:  { name: "성장형 핵심 고객", color: "#2E7D32", soft: "#E5F1E6" },
+  stable:  { name: "안정형 주력 고객", color: "#1F3864", soft: "#E7ECF4" },
+  dormant: { name: "이탈위험 휴면 고객", color: "#B23B3B", soft: "#F7E7E5" },
+};
+
+function delay(ms) { return new Promise(res => setTimeout(res, ms)); }
+
+// GET /api/v1/segments/summary
+async function apiGetSegmentSummary() {
+  try { return await fetchJson("/api/v1/segments/summary"); }
+  catch (e) { console.warn("백엔드 연결 실패, 목업 데이터 사용:", e.message); return mockSegmentSummary(); }
+}
+async function mockSegmentSummary() {
+  await delay(200);
+  return {
+    snapshot_date: "2026-07-03",
+    segments: [
+      { id: "growth", n: 286, pct: "14.3%", growth: "+20.0%", dir: "up",
+        oneLiner: "브랜드에 충성하며 정가로 자주 구매하고, YouTube·Instagram·TikTok에서 인플루언서 콘텐츠에 반응하는 고관여·고성장 고객군",
+        profile: [["연령대","30대","40.2%"],["성별","여성","79.4%"],["거주지역","수도권","67.5%"],["직업","사무직","31.8%"],["관심사","여행","26.6%"],["선호 스타일","오피스룩","33.2%"],["소비성향","브랜드충성형","42.0%"]],
+        metrics: [["최근 구매까지","14.1일"],["월평균 구매빈도","2.24회"],["12개월 누적 매출","522만원"],["평균 객단가","127,681원"],["정상가 비중","78.9%"],["재구매 주기","23.3일"],["30일 세션 수","5.38회"],["장바구니→구매 전환율","0.291"]] },
+      { id: "stable", n: 1106, pct: "55.3%", growth: "+3.4%", dir: "up",
+        oneLiner: "완만한 성장세를 유지하는 전체 볼륨의 절반 이상을 차지하는 주력 고객군",
+        profile: [["연령대","30대","34.1%"],["성별","여성","78.9%"],["거주지역","수도권","57.0%"],["직업","사무직","32.8%"],["관심사","뷰티","28.6%"],["선호 스타일","캐주얼","28.8%"],["소비성향","트렌드추구형","41.4%"]],
+        metrics: [["최근 구매까지","47.8일"],["월평균 구매빈도","1.02회"],["12개월 누적 매출","76.3만원"],["평균 객단가","55,173원"],["정상가 비중","49.3%"],["재구매 주기","51.5일"],["30일 세션 수","2.59회"],["장바구니→구매 전환율","0.179"]] },
+      { id: "dormant", n: 608, pct: "30.4%", growth: "-12.9%", dir: "down",
+        oneLiner: "절반 가까이가 최근 30일간 세션 자체가 없고, 활동이 있어도 상세조회 단계에서 대부분 이탈하는 고위험군",
+        profile: [["연령대","20대","41.6%"],["성별","여성","77.5%"],["거주지역","수도권","47.9%"],["직업","학생","32.4%"],["관심사","피트니스","21.1%"],["선호 스타일","캐주얼","41.4%"],["소비성향","실속형(가성비)","61.0%"]],
+        metrics: [["최근 구매까지","155.7일"],["월평균 구매빈도","0.44회"],["12개월 누적 매출","12.7만원"],["평균 객단가","26,674원"],["정상가 비중","23.4%"],["재구매 주기","117.7일"],["30일 세션 수","0.82회"],["장바구니→구매 전환율","0.005"]] },
+    ],
+  };
+}
+
+// GET /api/v1/segments/trends
+async function apiGetSegmentTrends() {
+  try { return await fetchJson("/api/v1/segments/trends"); }
+  catch (e) { console.warn("백엔드 연결 실패, 목업 데이터 사용:", e.message); return mockSegmentTrends(); }
+}
+async function mockSegmentTrends() {
+  await delay(150);
+  return {
+    months: ["2026-02","2026-03","2026-04","2026-05","2026-06","2026-07"],
+    growth:  [231, 244, 253, 261, 274, 286],
+    stable:  [1148, 1141, 1130, 1121, 1113, 1106],
+    dormant: [621, 615, 617, 618, 613, 608],
+    new_entrants: [58, 63, 51, 47, 55, 49],
+  };
+}
+
+// GET /api/v1/segments/migration
+async function apiGetMigrationMatrix() {
+  try { return await fetchJson("/api/v1/segments/migration"); }
+  catch (e) { console.warn("백엔드 연결 실패, 목업 데이터 사용:", e.message); return mockMigrationMatrix(); }
+}
+async function mockMigrationMatrix() {
+  await delay(150);
+  return {
+    growth:  { growth: 261, stable: 24, dormant: 1 },
+    stable:  { growth: 22, stable: 1040, dormant: 44 },
+    dormant: { growth: 3, stable: 42, dormant: 563 },
+  };
+}
+
+// GET /api/v1/customers?query=
+let MOCK_CUSTOMERS = null;
+function buildMockCustomers() {
+  if (MOCK_CUSTOMERS) return MOCK_CUSTOMERS;
+  const cats = ["원피스","니트","청바지","코트","가디건","액세서리","신발","가방"];
+  const segs = ["growth","stable","dormant"];
+  const weights = [0.143, 0.553, 0.304];
+  const rows = [];
+  for (let i = 1; i <= 60; i++) {
+    const r = Math.random();
+    let seg = "dormant"; let acc = 0;
+    for (let j = 0; j < segs.length; j++) { acc += weights[j]; if (r <= acc) { seg = segs[j]; break; } }
+    const base = seg === "growth" ? { recency: [8,25], freq: [1.6,3.0], amt: [3000000,8500000] }
+               : seg === "stable" ? { recency: [25,75], freq: [0.5,1.6], amt: [300000,1400000] }
+               : { recency: [90,220], freq: [0.1,0.7], amt: [20000,300000] };
+    const rand = (a,b) => a + Math.random()*(b-a);
+    rows.push({
+      id: "CUST" + String(i).padStart(5,"0"),
+      segment: seg,
+      recency: Math.round(rand(...base.recency)),
+      freq: rand(...base.freq).toFixed(2),
+      amount: Math.round(rand(...base.amt)),
+      topCategory: cats[Math.floor(Math.random()*cats.length)],
+    });
+  }
+  MOCK_CUSTOMERS = rows;
+  return rows;
+}
+async function apiSearchCustomers(query) {
+  try { return await fetchJson("/api/v1/customers?query=" + encodeURIComponent(query)); }
+  catch (e) {
+    console.warn("백엔드 연결 실패, 목업 데이터 사용:", e.message);
+    await delay(150);
+    const rows = buildMockCustomers();
+    const q = query.trim().toUpperCase();
+    if (!q) return [];
+    return rows.filter(r => r.id.includes(q)).slice(0, 20);
+  }
+}
+
+// POST /api/v1/campaigns/send
+async function apiSendCampaign(payload) {
+  try {
+    return await fetchJson("/api/v1/campaigns/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch (e) {
+    console.warn("백엔드 연결 실패, 발송을 시뮬레이션합니다:", e.message);
+    await delay(300);
+    return { status: "queued", log_id: "CMP-" + Date.now(), estimated_recipients: payload.estimated_recipients || 1 };
+  }
+}
+
+/* =========================================================================
+   상태 & 렌더링
+   ========================================================================= */
+let state = {
+  tab: "overview",
+  activeSegment: "growth",
+  summary: null,
+  trends: null,
+  migration: null,
+  searchQuery: "",
+  searchResults: [],
+  searchLoading: false,
+  campaignLog: [],
+  modal: null, // { segmentId, message }
+  toast: null,
+  syncTime: "2026-07-03 09:00 (배치 동기화)",
+  syncing: false,
+  apiStatus: "checking",
+};
+
+function esc(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function fmtWon(n) { return n.toLocaleString() + "원"; }
+
+const LOCAL_LOG_KEY = "retention_app_campaign_log";
+
+function loadCampaignLog() {
+  try {
+    const raw = localStorage.getItem(LOCAL_LOG_KEY);
+    if (!raw) return [];
+    const items = JSON.parse(raw);
+    return Array.isArray(items) ? items.sort((a, b) => b.ts - a.ts) : [];
+  } catch (e) {
+    console.error("localStorage 읽기 실패", e);
+    return [];
+  }
+}
+function saveCampaignLog(entry) {
+  try {
+    const current = loadCampaignLog();
+    current.unshift(entry);
+    localStorage.setItem(LOCAL_LOG_KEY, JSON.stringify(current));
+  } catch (e) {
+    console.error("localStorage 저장 실패", e);
+  }
+}
+
+async function pingApi() {
+  try {
+    await fetchJson("/api/v1/segments/summary");
+    state.apiStatus = "connected";
+  } catch (e) {
+    state.apiStatus = "offline";
+  }
+  render();
+}
+
+async function init() {
+  render();
+  const [summary, trends, migration, log] = await Promise.all([
+    apiGetSegmentSummary(), apiGetSegmentTrends(), apiGetMigrationMatrix(), Promise.resolve(loadCampaignLog()),
+  ]);
+  state.summary = summary; state.trends = trends; state.migration = migration; state.campaignLog = log;
+  render();
+  pingApi();
+}
+
+async function doSync() {
+  state.syncing = true; render();
+  const summary = await apiGetSegmentSummary();
+  state.summary = summary;
+  state.syncing = false;
+  state.syncTime = new Date().toISOString().slice(0,16).replace("T"," ") + " (수동 동기화)";
+  showToast("최신 세그먼트 데이터를 불러왔습니다.");
+  render();
+}
+
+function setTab(tab) { state.tab = tab; render(); }
+function setActiveSegment(id) { state.activeSegment = id; render(); }
+
+async function doSearch(q) {
+  state.searchQuery = q; state.searchLoading = true; render();
+  state.searchResults = await apiSearchCustomers(q);
+  state.searchLoading = false; render();
+}
+
+function openSendModal(segmentId, message) { state.modal = { segmentId, message }; render(); }
+function closeModal() { state.modal = null; render(); }
+
+async function confirmSend() {
+  const { segmentId, message } = state.modal;
+  const seg = state.summary.segments.find(s => s.id === segmentId);
+  const res = await apiSendCampaign({ target: { type: "segment", id: segmentId }, channel: message[0], message_template_id: message[2], estimated_recipients: seg.n });
+  const entry = { log_id: res.log_id, segment: segmentId, segmentName: SEGMENT_META[segmentId].name, channel: message[0], copy: message[2], recipients: res.estimated_recipients, ts: Date.now(), status: "sent" };
+  state.campaignLog.unshift(entry);
+  await saveCampaignLog(entry);
+  state.modal = null;
+  showToast(`"${message[0]}" 캠페인 발송 완료 (시뮬레이션, 대상 ${res.estimated_recipients.toLocaleString()}명)`);
+  render();
+}
+
+function showToast(msg) {
+  state.toast = msg; render();
+  setTimeout(() => { state.toast = null; render(); }, 3200);
+}
+
+/* ---------- render helpers ---------- */
+function renderTopbar() {
+  return `
+    <div class="topbar">
+      <div>
+        <div class="eyebrow">Customer Retention App · 배치 동기화 기반</div>
+        <h1>세 갈래로 갈라진 고객, 세 갈래의 전략</h1>
+        <p class="subhead">백엔드 세그먼트 API(GET /api/v1/segments/*)와 캠페인 발송 API(POST /api/v1/campaigns/send)를 연동한 운영용 대시보드입니다.</p>
+      </div>
+      <div class="sync-box">
+        마지막 동기화<br/><span class="sync-time">${esc(state.syncTime)}</span><br/>
+        <button class="btn ghost" style="border:1px solid var(--ink)" onclick="doSync()" ${state.syncing ? "disabled" : ""}>${state.syncing ? "동기화 중…" : "지금 동기화"}</button>
+      </div>
+    </div>
+    <div class="tabs">
+      ${[["overview","세그먼트 개요"],["trends","세그먼트 추이"],["search","고객 검색"],["campaign","캠페인 관리"]].map(([id,label]) =>
+        `<button class="tab-btn${state.tab===id?" active":""}" onclick="setTab('${id}')">${label}</button>`).join("")}
+    </div>
+  `;
+}
+
+function renderOverview() {
+  if (!state.summary) return `<div class="empty-state">불러오는 중…</div>`;
+  const segs = state.summary.segments;
+  const active = segs.find(s => s.id === state.activeSegment);
+  return `
+    <div class="seg-strip">
+      ${segs.map(s => `
+        <button class="seg-card${s.id===state.activeSegment?" active":""}" style="--seg-color:${SEGMENT_META[s.id].color}" onclick="setActiveSegment('${s.id}')">
+          <div class="seg-name">${SEGMENT_META[s.id].name}</div>
+          <div class="seg-meta"><span>${s.n.toLocaleString()}명</span><span>${s.pct}</span></div>
+          <div class="seg-size">${s.pct}</div>
+          <div class="seg-growth" style="color:${s.id===state.activeSegment?"#fff":SEGMENT_META[s.id].color}">매출 ${s.dir==="up"?"▲":"▼"} ${s.growth}</div>
+        </button>`).join("")}
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title">${SEGMENT_META[active.id].name}</div>
+        <div class="panel-badge" style="background:${SEGMENT_META[active.id].soft};color:${SEGMENT_META[active.id].color}">${active.n.toLocaleString()}명 · ${active.pct}</div>
+        <div class="panel-badge" style="background:${SEGMENT_META[active.id].soft};color:${SEGMENT_META[active.id].color}">매출 ${active.dir==="up"?"▲":"▼"} ${active.growth}</div>
+      </div>
+      <p class="panel-oneliner">${esc(active.oneLiner)}</p>
+      <div class="section-label">인구통계 · 취향 프로필</div>
+      <div class="chip-row">${active.profile.map(([l,v,p]) => `<div class="chip"><b>${esc(v)}</b><span class="pct">${p}</span> · ${esc(l)}</div>`).join("")}</div>
+      <div class="section-label">핵심 행동 지표</div>
+      <div class="metric-grid">${active.metrics.map(([l,v]) => `<div class="metric-card"><div class="metric-label">${esc(l)}</div><div class="metric-value" style="color:${SEGMENT_META[active.id].color}">${esc(v)}</div></div>`).join("")}</div>
+    </div>
+  `;
+}
+
+function renderLineChart(trends) {
+  const W = 640, H = 260, padL = 40, padB = 26, padT = 10, padR = 10;
+  const months = trends.months;
+  const maxV = Math.max(...trends.growth, ...trends.stable, ...trends.dormant) * 1.1;
+  const x = i => padL + (i/(months.length-1)) * (W - padL - padR);
+  const y = v => H - padB - (v/maxV) * (H - padT - padB);
+  const line = arr => arr.map((v,i) => `${i===0?"M":"L"} ${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(" ");
+  const seriesDefs = [["growth","#2E7D32"],["stable","#1F3864"],["dormant","#B23B3B"]];
+  const gridLines = [0,0.25,0.5,0.75,1].map(t => {
+    const yy = H - padB - t*(H-padT-padB);
+    return `<line x1="${padL}" y1="${yy}" x2="${W-padR}" y2="${yy}" stroke="#E4DFD3" stroke-width="1"/>`;
+  }).join("");
+  const xLabels = months.map((m,i) => `<text x="${x(i)}" y="${H-8}" font-size="10" fill="#8A8F9C" text-anchor="middle" font-family="var(--font-data)">${m.slice(5)}월</text>`).join("");
+  const paths = seriesDefs.map(([key,color]) => `<path d="${line(trends[key])}" fill="none" stroke="${color}" stroke-width="2.4"/>` +
+    trends[key].map((v,i) => `<circle cx="${x(i)}" cy="${y(v)}" r="3" fill="${color}"/>`).join("")).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;">${gridLines}${paths}${xLabels}</svg>`;
+}
+
+function renderTrends() {
+  if (!state.trends || !state.migration) return `<div class="empty-state">불러오는 중…</div>`;
+  const t = state.trends;
+  const lastMonthNew = t.new_entrants[t.new_entrants.length-1];
+  const segIds = ["growth","stable","dormant"];
+  return `
+    <div class="section-label">월별 세그먼트 규모 추이</div>
+    <div class="trend-grid">
+      <div class="card">
+        <div class="legend">
+          ${segIds.map(id => `<span><i style="background:${SEGMENT_META[id].color}"></i>${SEGMENT_META[id].name}</span>`).join("")}
+        </div>
+        ${renderLineChart(t)}
+      </div>
+      <div class="card">
+        <div class="section-label" style="margin-top:0">이번 달 신규 편입</div>
+        <div class="metric-value" style="font-size:30px;color:var(--brass)">${lastMonthNew}명</div>
+        <div style="font-size:12px;color:var(--ink-faint);margin-bottom:16px">최근 30일 내 처음 세그먼트가 배정된 고객</div>
+        <ul class="cohort-list">
+          ${t.months.map((m,i) => `<li><span>${m}</span><span class="cohort-val">${t.new_entrants[i]}명</span></li>`).join("")}
+        </ul>
+      </div>
+    </div>
+
+    <div class="section-label">세그먼트 이동 매트릭스 (지난달 → 이번달)</div>
+    <div class="card">
+      <table class="mig">
+        <tr><th>이전 \\ 현재</th>${segIds.map(id => `<th>${SEGMENT_META[id].name}</th>`).join("")}</tr>
+        ${segIds.map(row => `<tr><th>${SEGMENT_META[row].name}</th>${segIds.map(col => `<td class="${row===col?"diag":""}">${state.migration[row][col].toLocaleString()}</td>`).join("")}</tr>`).join("")}
+      </table>
+      <p style="font-size:12px;color:var(--ink-faint);margin-top:10px;margin-bottom:0">대각선(음영)은 세그먼트를 유지한 고객 수, 그 외는 이동한 고객 수입니다.</p>
+    </div>
+  `;
+}
+
+function renderSearch() {
+  return `
+    <div class="section-label">고객 ID 검색</div>
+    <div class="search-row">
+      <input class="search-input" placeholder="예: CUST00012" value="${esc(state.searchQuery)}"
+        oninput="doSearch(this.value)" />
+    </div>
+    ${state.searchLoading ? `<div class="empty-state">검색 중…</div>` :
+      state.searchQuery.trim() === "" ? `<div class="empty-state">고객 ID를 입력하면 세그먼트·구매 지표를 조회합니다.</div>` :
+      state.searchResults.length === 0 ? `<div class="empty-state">검색 결과가 없습니다.</div>` :
+      `<div class="result-list">
+        <div class="result-row head"><span>고객ID</span><span>세그먼트</span><span>최근성</span><span>구매빈도</span><span>12개월 매출 / 관심 카테고리</span><span></span></div>
+        ${state.searchResults.map(c => `
+          <div class="result-row">
+            <span style="font-family:var(--font-data)">${c.id}</span>
+            <span><span class="seg-pill" style="background:${SEGMENT_META[c.segment].color}">${SEGMENT_META[c.segment].name}</span></span>
+            <span>${c.recency}일</span>
+            <span>${c.freq}회</span>
+            <span>${fmtWon(c.amount)} · ${c.topCategory}</span>
+            <button class="btn small" onclick="setTab('campaign'); setActiveSegment('${c.segment}')">캠페인 보기</button>
+          </div>`).join("")}
+      </div>`}
+  `;
+}
+
+function renderCampaign() {
+  if (!state.summary) return `<div class="empty-state">불러오는 중…</div>`;
+  const MESSAGES = {
+    growth: [["Instagram / YouTube","브랜드 스토리텔링 · 룩북 필름","당신의 취향을 가장 잘 아는 브랜드, 이번 시즌도 함께해요"],
+             ["TikTok","신제품 런칭 티저","먼저 만나보는 신상 — VIP 얼리 액세스"]],
+    stable: [["Instagram","트렌드 큐레이션 숏폼 + 코디 추천","이번 주 트렌드, 니트엔 이 스커트 어때요?"],
+             ["네이버 / 카카오","신상 + 소폭 할인 결합 메시지","신상 입고 + 첫 구매 혜택, 지금 확인하세요"]],
+    dormant: [["네이버 / 카카오 / Facebook","강한 가격 인센티브 윈백","오랜만이에요 — 지금 30% 할인으로 다시 만나요"],
+              ["Instagram","짧고 강한 CTA (저관여 대응)","놓치면 후회할 특가, 24시간 한정"]],
+  };
+  const segs = state.summary.segments;
+  return `
+    <div class="section-label">세그먼트별 캠페인 메시지</div>
+    ${segs.map(s => `
+      <div class="section-label" style="color:${SEGMENT_META[s.id].color}">${SEGMENT_META[s.id].name} (${s.n.toLocaleString()}명)</div>
+      ${MESSAGES[s.id].map(m => `
+        <div class="msg-card">
+          <div class="msg-top">
+            <div>
+              <div class="msg-channel">${esc(m[0])}</div>
+              <div class="msg-format">${esc(m[1])}</div>
+              <div class="msg-copy">"${esc(m[2])}"</div>
+            </div>
+            <button class="btn" onclick='openSendModal("${s.id}", ${JSON.stringify(m)})'>발송</button>
+          </div>
+        </div>`).join("")}
+    `).join("")}
+
+    <div class="section-label">발송 이력</div>
+    ${state.campaignLog.length === 0 ? `<div class="empty-state">아직 발송 이력이 없습니다.</div>` : `
+      <table class="log-table">
+        <tr><th>시각</th><th>세그먼트</th><th>채널</th><th>메시지</th><th>대상</th><th>상태</th></tr>
+        ${state.campaignLog.map(l => `
+          <tr>
+            <td style="font-family:var(--font-data);font-size:11.5px">${new Date(l.ts).toLocaleString()}</td>
+            <td>${esc(l.segmentName)}</td>
+            <td>${esc(l.channel)}</td>
+            <td>"${esc(l.copy)}"</td>
+            <td>${l.recipients.toLocaleString()}명</td>
+            <td><span class="status-tag">발송완료(시뮬레이션)</span></td>
+          </tr>`).join("")}
+      </table>`}
+  `;
+}
+
+function renderModal() {
+  if (!state.modal) return "";
+  const { segmentId, message } = state.modal;
+  const seg = state.summary.segments.find(s => s.id === segmentId);
+  return `
+    <div class="modal-overlay" onclick="if(event.target===this) closeModal()">
+      <div class="modal-box">
+        <h3>캠페인 발송 확인</h3>
+        <p>
+          <b>${SEGMENT_META[segmentId].name}</b> 세그먼트 <b>${seg.n.toLocaleString()}명</b>에게<br/>
+          "${esc(message[0])}" 채널로 아래 메시지를 발송합니다.<br/><br/>
+          <i>"${esc(message[2])}"</i>
+        </p>
+        <div class="modal-actions">
+          <button class="btn ghost" style="border:1px solid var(--ink)" onclick="closeModal()">취소</button>
+          <button class="btn" onclick="confirmSend()">발송 확정</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function render() {
+  const body = state.tab === "overview" ? renderOverview()
+             : state.tab === "trends" ? renderTrends()
+             : state.tab === "search" ? renderSearch()
+             : renderCampaign();
+  document.getElementById("root").innerHTML = `
+    <div class="wrap">
+      ${renderTopbar()}
+      ${body}
+      <footer>
+        API 서버: <span id="api-status" style="color:${state.apiStatus==="connected"?"var(--green)":state.apiStatus==="offline"?"var(--brick)":"var(--ink-faint)"}">${state.apiStatus==="connected"?"연결됨 ✓":state.apiStatus==="offline"?"미연결 — 목업 데이터로 표시 중":"확인 중…"}</span> (API_BASE = ${esc(API_BASE)})<br/>
+        발송 이력은 이 브라우저의 localStorage에 저장됩니다 (다른 기기/브라우저와는 공유되지 않음).
+      </footer>
+    </div>
+    ${renderModal()}
+    ${state.toast ? `<div class="toast">${esc(state.toast)}</div>` : ""}
+  `;
+}
+
+init();
+</script>
+
+</body>
+</html>
