@@ -104,9 +104,10 @@ app.get("/api/v1/customers/:id", (req, res) => {
 // 그래프 DB(Neo4j) 탐색: 같은 상품을 조회한 다른 고객 찾기.
 // Neo4j 환경변수가 없으면 configured:false로 응답 (프론트엔드가 그래프 미연결 안내를 표시함).
 app.get("/api/v1/customers/:id/similar", async (req, res) => {
+  const customerId = req.params.id.toUpperCase(); // 검색 엔드포인트와 동일하게 대소문자 구분 없이 처리
   try {
-    const { configured, results } = await graph.findSimilarCustomers(req.params.id, 10);
-    res.json({ configured, customerId: req.params.id, similar: results });
+    const { configured, results } = await graph.findSimilarCustomers(customerId, 10);
+    res.json({ configured, customerId, similar: results });
   } catch (e) {
     console.error("graph query failed:", e.message); // 상세 원인은 서버 로그에만 남김
     res.status(500).json({ error: "graph_query_failed", message: "그래프 조회에 실패했습니다." });
