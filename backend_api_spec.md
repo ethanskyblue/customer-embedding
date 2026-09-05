@@ -139,3 +139,7 @@ GET /api/v1/campaigns/logs?segment_id=dormant&limit=20
 지금 드리는 `frontend/index.html`(Customer Embedding App)은 위 5개 엔드포인트를 호출하는 지점에
 `// TODO: fetch('/api/v1/...')`  주석과 함께 목업 함수가 들어가 있습니다.
 실제 백엔드가 준비되면 목업 함수 내부를 fetch 호출로 교체하기만 하면 됩니다 (UI 로직은 변경 불필요).
+
+> **업데이트**: `backend/gateways/`에 카카오 알림톡(알리고)/SMS/이메일(SendGrid)/푸시(FCM) 실제 발송
+> 어댑터가 구현되어 있습니다. `POST /api/v1/campaigns/send`는 더 이상 목업이 아니라 이 어댑터들을
+> 실제로 호출하며, 자격증명이 없을 때만 자동으로 시뮬레이션 상태를 반환합니다.

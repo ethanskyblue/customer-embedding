@@ -10,6 +10,7 @@ const express = require("express");
 const cors = require("cors");
 const path = require("path");
 const { dispatchCampaign, GATEWAYS } = require("./gateways");
+const graph = require("./graph");
 
 const app = express();
 app.use(cors());
@@ -100,6 +101,18 @@ app.get("/api/v1/customers/:id", (req, res) => {
   res.json(row);
 });
 
+// 그래프 DB(Neo4j) 탐색: 같은 상품을 조회한 다른 고객 찾기.
+// Neo4j 환경변수가 없으면 configured:false로 응답 (프론트엔드가 그래프 미연결 안내를 표시함).
+app.get("/api/v1/customers/:id/similar", async (req, res) => {
+  try {
+    const { configured, results } = await graph.findSimilarCustomers(req.params.id, 10);
+    res.json({ configured, customerId: req.params.id, similar: results });
+  } catch (e) {
+    console.error("graph query failed:", e.message); // 상세 원인은 서버 로그에만 남김
+    res.status(500).json({ error: "graph_query_failed", message: "그래프 조회에 실패했습니다." });
+  }
+});
+
 // 실제 발송 게이트웨이(카카오 알림톡/SMS/이메일/푸시) 연동.
 // gateway 파라미터로 카카오/SMS/이메일/푸시 중 하나를 지정하면 gateways/index.js가
 // 해당 대행사 API를 실제로 호출합니다 (자격증명이 없으면 자동으로 시뮬레이션 처리).
@@ -151,6 +164,10 @@ app.get("/api/v1/gateways/status", (req, res) => {
   res.json(status);
 });
 
+app.get("/api/v1/graph/status", (req, res) => {
+  res.json({ neo4j: { configured: graph.isConfigured() } });
+});
+
 app.get("/api/v1/campaigns/logs", (req, res) => {
   const limit = parseInt(req.query.limit || "20", 10);
   res.json(campaignLogs.slice(0, limit));
@@ -167,3 +184,7 @@ app.get("/", (req, res) => {
 app.listen(PORT, () => {
   console.log(`Customer Embedding API listening on port ${PORT}`);
 });
+
+process.on("SIGTERM", async () => { await graph.closeDriver(); process.exit(0); });
+process.on("SIGINT", async () => { await graph.closeDriver(); process.exit(0); });
+

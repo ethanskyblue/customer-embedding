@@ -11,6 +11,7 @@ customer-embedding/
 │   └── index.html      ← 정적 프론트엔드 (Render Static Site로 배포)
 └── backend/
     ├── server.js        ← API 서버 (Render Web Service로 배포) — data/*.json을 읽어서 응답
+    ├── gateways/         ← 카카오 알림톡/SMS/이메일/푸시 발송 어댑터
     └── package.json
 ```
 
@@ -60,7 +61,27 @@ python3 -m http.server 8000   # 또는 VSCode Live Server 등
    - **Publish Directory**: `.`
 4. 배포 완료 → `https://프로젝트명.onrender.com`으로 접속하면 실제 백엔드와 연동된 앱이 뜹니다.
 
-## 캠페인 발송 게이트웨이 설정 (카카오 알림톡 등)
+## 그래프 DB 연동 (고객 검색 탭의 "비슷한 고객 보기")
+
+`backend/graph.js`가 Neo4j 그래프 DB(별도로 만드신 Customer-Session-Product-Category 그래프)에 접속해,
+특정 고객과 같은 상품을 조회한 다른 고객을 찾아줍니다.
+
+**설정 방법**
+```bash
+cd backend
+# .env에 아래 값 추가 (Aura 콘솔의 인스턴스 상세 화면에서 확인)
+NEO4J_URI=neo4j+s://xxxx.databases.neo4j.io
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=발급받은비밀번호
+```
+설정하지 않으면 "고객 검색" 탭의 **비슷한 고객** 버튼을 눌렀을 때 "그래프 DB가 연결되지 않았다"는 안내만 뜨고,
+나머지 기능(세그먼트 조회, 캠페인 발송 등)은 그대로 정상 동작합니다 — 다른 게이트웨이들과 동일한 폴백 원칙입니다.
+
+**엔드포인트**
+- `GET /api/v1/customers/:id/similar` — 지정한 고객과 겹치는 상품을 많이 조회한 고객 목록
+- `GET /api/v1/graph/status` — Neo4j 연결 설정 여부 확인
+
+
 
 `backend/gateways/`에 채널별 발송 코드가 들어있습니다.
 
@@ -87,8 +108,6 @@ Render Web Service에 배포할 때는 `.env` 파일 대신 Render 대시보드�
 **주의**: 지금 구현은 세그먼트 전체(수백~수천 명)에게 보낼 때도 HTTP 요청 안에서 동기적으로 반복 호출합니다
 (데모 목적으로 최대 20명까지만 실제 호출). 실서비스에서는 요청을 큐(SQS/RabbitMQ/BullMQ 등)에 넣고
 워커가 비동기로 순차 발송하도록 바꿔야 합니다 — 그렇지 않으면 세그먼트가 크면 요청이 타임아웃납니다.
-
-
 
 ## ERP 연동 (실제 데이터로 전환하기)
 
