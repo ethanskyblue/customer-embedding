@@ -270,11 +270,18 @@ async function apiSendCampaign(payload) {
 // GET /api/v1/customers/:id/similar  (Neo4j 그래프 DB 탐색)
 async function apiGetSimilarCustomers(customerId) {
   try {
-    const res = await fetchJson(`/api/v1/customers/${encodeURIComponent(customerId)}/similar`);
-    return { configured: res.configured, similar: res.similar };
+    const res = await fetch(API_BASE + `/api/v1/customers/${encodeURIComponent(customerId)}/similar`);
+    if (res.status === 500) {
+      // 백엔드가 그래프 조회는 시도했지만 실패한 경우 (예: DB 이름 불일치, 인증 실패 등)
+      const body = await res.json().catch(() => ({}));
+      return { configured: true, similar: [], error: body.message || "그래프 조회 중 오류가 발생했습니다.", offline: false };
+    }
+    if (!res.ok) throw new Error("API error " + res.status);
+    const body = await res.json();
+    return { configured: body.configured, similar: body.similar, error: null, offline: false };
   } catch (e) {
-    console.warn("백엔드/그래프 연결 실패:", e.message);
-    return { configured: false, similar: [] };
+    console.warn("백엔드 연결 실패:", e.message);
+    return { configured: false, similar: [], error: null, offline: true };
   }
 }
 
@@ -294,6 +301,7 @@ let state = {
   similarLoading: false,
   similarResults: [],
   similarGraphConfigured: true,
+  similarError: null,
   campaignLog: [],
   modal: null, // { segmentId, message }
   toast: null,
@@ -368,9 +376,10 @@ async function doSearch(q) {
 }
 
 async function showSimilarCustomers(customerId) {
-  state.similarFor = customerId; state.similarLoading = true; render();
+  state.similarFor = customerId; state.similarLoading = true; state.similarError = null; render();
   const res = await apiGetSimilarCustomers(customerId);
-  state.similarGraphConfigured = res.configured;
+  state.similarGraphConfigured = !res.offline;
+  state.similarError = res.error;
   state.similarResults = res.similar;
   state.similarLoading = false; render();
 }
@@ -551,7 +560,8 @@ function renderSimilarPanel() {
     <div class="section-label">'${esc(state.similarFor)}'와(과) 비슷한 상품을 본 고객 (그래프 DB 탐색)</div>
     <div class="card">
       ${state.similarLoading ? `<div class="empty-state">그래프에서 탐색 중…</div>` :
-        !state.similarGraphConfigured ? `<div class="empty-state">그래프 DB가 아직 연결되지 않아 이 기능을 쓸 수 없습니다 (백엔드에 NEO4J_* 환경변수 설정 필요).</div>` :
+        !state.similarGraphConfigured ? `<div class="empty-state">백엔드에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.</div>` :
+        state.similarError ? `<div class="empty-state" style="color:var(--brick)">그래프 조회 중 오류: ${esc(state.similarError)}<br/>(백엔드 Logs 탭에서 'graph query failed:' 로그를 확인하세요 — NEO4J_DATABASE 값 등을 점검해보세요)</div>` :
         state.similarResults.length === 0 ? `<div class="empty-state">겹치는 상품을 본 다른 고객이 없습니다.</div>` :
         `<table class="log-table">
           <tr><th>고객ID</th><th>겹치는 조회 상품 수</th></tr>
