@@ -1,0 +1,17 @@
+{
+  "growth": {
+    "growth": 294,
+    "stable": 0,
+    "dormant": 0
+  },
+  "stable": {
+    "growth": 0,
+    "stable": 1106,
+    "dormant": 0
+  },
+  "dormant": {
+    "growth": 0,
+    "stable": 0,
+    "dormant": 600
+  }
+}
