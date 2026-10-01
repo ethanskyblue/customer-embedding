@@ -1,5 +1,5 @@
 {
-  "snapshot_date": "2026-09-13",
+  "snapshot_date": "2026-10-01",
   "source_file": "data/customer_embedding_training_data_2000_segmented.xlsx",
   "method": "이벤트 로그 집계 + PCA 임베딩 + Dense Fusion + K-means (k=3, silhouette=0.120)",
   "segments": [
